@@ -1,2 +1,2 @@
-# research
-This repository includes my research projects
+# Research
+Psychology Research Projects
