@@ -1,0 +1,145 @@
+---
+title: "C.Fu_Thesis_Code"
+output: html_document
+date: "2023-02-22"
+---
+
+```{r packages}
+library(apaTables)
+library(broom)
+library(cluster)
+library(plyr)
+library(dbplyr)
+library(dplyr)
+library(data.table)
+library(flextable)
+library(ggplot.multistats)
+library(ggplot2)
+library(haven)
+library(jmv)
+library(knitr)
+library(labeling)
+library(lavaan)
+library(na.tools)
+library(magrittr)
+library(skimr)
+library(tibble)
+library(tidyverse)
+library(tidyr)
+library(tidyselect)
+library(rmarkdown)
+library(rempsyc)
+# if (!require(sjPlot)) {install.packages(“sjPlot”); require(“sjPlot”)}
+```
+
+##################
+categoric_demographic <- bind_rows(sex, race, pcgrel3, pcgrel5)
+rownames(categoric_demographic) <- c("Sex", "boys","girls", "Race","White","Black","Hispanic","Multi-racial","Other", "Caregiver relationship at Year 3","Biological mother","Biological father", "Caregiver relationship at Year 5","Biological mother","Biological father")
+namedrows<-rownames(categoric_demographic)
+
+attributes(categoric_demographic)$subheaders <- c("text1", "text2","text3")
+demographics.table2 <- nice_table( 
+    categoric_demographic[c(1:20), ], 
+    title = c("Table 2", "Sex, race, and caregiver relationships of participants"))
+save_as_docx(demographics.table2, path = "/Users/fuyasushihime/OneDrive - brynmawr.edu/FFCWS/demoTbl2.docx")
+
+detach(variables_interest)
+```
+
+
+```{r covariate correlational analysis}
+# standard Pearson correlation
+# Shapiro-Wilk normality test for sex
+shapiro.test(variables_interest$cm1bsex) # => p < 2.2e-16
+# Shapiro-Wilk normality test for race
+shapiro.test(variables_interest$ck6ethrace) # => p < 2.2e-16
+# Shapiro-Wilk normality test for pcg hhinc
+shapiro.test(variables_interest$pcg3hhinc) # => p < 2.2e-16
+shapiro.test(variables_interest$pcg4hhinc)
+# Shapiro-Wilk normality test for pcg edu
+shapiro.test(variables_interest$pcg3edu) # => p < 2.2e-16
+shapiro.test(variables_interest$pcg4edu)
+# corrMatrix function (part of the jmv package)
+
+correlation <- corrMatrix(variables_interest, vars = vars(cm1bsex, ck6ethrace, pcg3hhinc, pcg4hhinc, pcg3edu,pcg4edu, cogStim1, cogStim2, ch3ppvtstd, ch4ppvtstd))
+#corrMatrix(variables_interest, vars = vars(cm1bsex, ck6ethrace, pcg3hhinc, pcg4hhinc, pcg3edu,pcg4edu, cogStim1, cogStim2, ch3ppvtstd, ch4ppvtstd))
+correlation <- as.data.frame(correlation$matrix)
+correlation <- correlation %>%
+  select(1,5,7,9,11,13,15,17,19,21,23)
+
+colnames(correlation)<- c("Variable", "Child's Gender", "Child's Race", "Household Income Year 3", "Household Income Year 5", "Caregiver Education Year 3",  "Caregiver Education Year 5", "Cognitive Stimulation at Year 3", "Cognitive Stimulation at Year 5", "PPVT Score Year 3", "PPVT Score Year 5")
+
+correlation_table <- nice_table(
+    correlation[c(1:11), ],
+    title = c("Table 2", "Correlations between covariates and observed variables"),
+    note = "* indicates p < 0.05")
+flextable::save_as_docx(correlation_table, path = "/Users/fuyasushihime/OneDrive - brynmawr.edu/FFCWS/corrMatrix.docx")
+#save_as_docx(corr, path = "/Users/fuyasushihime/OneDrive - brynmawr.edu/FFCWS/corrMatrix.docx")
+```
+
+
+
+```{r BLCSM model}
+CogStim_ppvt_T <- '
+#Defining the latent variables
+cogStim1 =~ 1*cogStim1
+cogStim2 =~ 1*cogStim2
+
+ch3ppvtstd =~ 1*ch3ppvtstd
+ch4ppvtstd =~ 1*ch4ppvtstd
+
+#Define regressions
+cogStim2 ~ 1*cogStim1     # This parameter regresses cogStim2 perfectly on cogStim1
+ch4ppvtstd ~ 1*ch3ppvtstd     # This parameter regresses ch4ppvtstd perfectly on ch3ppvtstd
+
+#Define the change score
+dCogStim =~ 1*cogStim2        # This defines the change score as measured perfectly by scores on cogStim2
+dPPVT =~ 1*ch4ppvtstd           # This defines the change score as measured perfectly by scores on ch4ppvtstd
+
+#Estimate residual variances
+cogStim_1 ~~ cogStim_1          # This estimates the cogStim residual variances
+dCogStim ~~ dCogStim          # This estimates the dCogStim residual variances
+ch3ppvtstd ~~ ch3ppvtstd         # This estimates the ch3ppvtstd residual variances
+dPPVT ~~ dPPVT         # This estimates the dPPVT residual variances
+
+#Covariates 
+#cogStim1 ~ cm1bsex + ck6ethrace + pcg3edu + pcg4edu + pcg3hhinc + pcg4hhinc
+#ch3ppvtstd ~ cm1bsex + ck6ethrace + pcg3edu + pcg4edu + pcg3hhinc + pcg4hhinc
+'
+
+fit_CogStim_T <- lavaan(CogStim_ppvt_T, data=variables_interest, missing="FIML.x", estimator="MLR")
+```
+
+
+```{r BLCS}
+BLCS<-'
+cogStim2 ~ 1*cogStim1     # This parameter regresses cogStim2 perfectly on cogStim1
+dCogStim =~ 1*cogStim2     # This defines the latent change score factor as measured perfectly by scores on cogStim2
+dCogStim ~ 1             # This estimates the intercept of the change score
+cogStim1 ~  1           # This estimates the intercept of cogStim1
+cogStim2 ~ 0*1          # This constrains the intercept of cogStim2 to 0
+
+ch4ppvtstd ~ 1*ch3ppvtstd     # This parameter regresses ch4ppvtstd perfectly on ch3ppvtstd
+dPPVT =~ 1*ch4ppvtstd     # This defines the latent change score factor as measured perfectly by scores on ch4ppvtstd
+ch4ppvtstd ~ 0*1          # This line constrains the intercept of ch4ppvtstd to 0
+ch4ppvtstd ~~ 0*ch4ppvtstd    # This fixes the variance of the ch3ppvtstd to 0
+
+dCogStim ~~  dCogStim       # This estimates the variance of the change scores
+cogStim1 ~~   cogStim1    # This estimates the variance of the cogStim1
+cogStim2 ~~ 0*cogStim2    # This fixes the variance of the cogStim2 to 0
+dPPVT ~ 1             # This estimates the intercept of the change score
+ch3ppvtstd ~ 1            # This estimates the intercept of ch3ppvtstd
+dPPVT ~~ dPPVT        # This estimates the variance of the change scores
+ch3ppvtstd ~~ ch3ppvtstd      # This estimates the variance of ch3ppvtstd
+dPPVT~cogStim1+ch3ppvtstd   # This estimates the COG to NEU coupling parameter and the COG to COG self-feedback
+dCogStim~ch3ppvtstd+cogStim1   # This estimates the NEU to COG coupling parameter and the NEU to NEU self-feedback
+cogStim1 ~~  ch3ppvtstd     # This estimates the cogStim1 ch3ppvtstd covariance
+dCogStim~~dPPVT          # This estimates the dCOG and dNEU covariance
+
+#Covariates 
+#cogStim1 ~ pcg3edu + pcg3hhinc 
+#ch3ppvtstd ~ pcg3edu + pcg3hhinc
+'
+fitBLCS <- lavaan(BLCS, data=variables_interest, estimator='mlr',fixed.x=FALSE,missing='fiml.x')
+summary(fitBLCS, fit.measures=TRUE, standardized=TRUE, rsquare=TRUE)
+```
