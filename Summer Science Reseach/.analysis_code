@@ -1,0 +1,69 @@
+```{correlations between neighborhood responsiveness and neighborhood collective efficacy}
+jmv::linReg(
+    data = data,
+    dep = ch4ppvtstdT3,
+    covs = vars(ch3_pr, cp3_nce),
+    factors = cf2md_libT3,
+    blocks = list(
+        list(
+            "ch3_pr",
+            "cp3_nce",
+            "cf2md_libT3")),
+    refLevels = list(
+        list(
+            var="cf2md_libT3",
+            ref="0")))
+
+jmv::linReg(
+    data = data,
+    dep = ch3_pr,
+    covs = cp3_nce,
+    factors = cf2md_libT3,
+    blocks = list(
+        list(
+            "cf2md_libT3",
+            "cp3_nce")),
+    refLevels = list(
+        list(
+            var="cf2md_libT3",
+            ref="0")))
+```
+
+
+```{moderation effect of parental responsiveness and neighborhood collective efficacy on child language dev}
+medmod::mod(
+    data = data,
+    dep = ch3_pr,
+    mod = cp3_nce,
+    pred = cm2md_libT3,
+    simpleSlopeEst = TRUE,
+    simpleSlopePlot = TRUE)
+```
+
+```{mediation effect of parental responsiveness on child language dev}
+medmod::med(
+    data = data,
+    dep = ch4ppvtstdT3,
+    med = ch3_pr,
+    pred = cm2md_libT3,
+    paths = TRUE,
+    estPlot = TRUE)
+```
+
+```{household income as covariate}
+jmv::linReg(
+    data = data,
+    dep = ch4ppvtstdT3,
+    covs = vars(cm3hhinc, ch3_pr, cp3_nce),
+    factors = cm2md_libT3,
+    blocks = list(
+        list(
+            "cm3hhinc",
+            "cm2md_libT3",
+            "ch3_pr",
+            "cp3_nce")),
+    refLevels = list(
+        list(
+            var="cm2md_libT3",
+            ref="0")))
+```
