@@ -1,5 +1,5 @@
 # Research
-Psychology Research Projects
+## Psychology Research Projects
 
 Here is the summary of research projects I have done since college. 
 
